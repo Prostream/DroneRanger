@@ -3,7 +3,8 @@ _Backyard wildlife–safe patrol drone (ROS 2 · PX4 · Gazebo)_
 
 **PI / Advisor:** **Yoon, Ilmi** (Northeastern University – Silicon Valley)
 
-![drone-image](https://github.com/user-attachments/assets/5fb319f3-ea0c-4afe-8f70-949a77e94f5b)
+![drone-image](https://github.com/user-attachments/assets/b8e94ad4-c9ad-49e9-b498-fe2e88ef97f2)
+
 
 
 ---
