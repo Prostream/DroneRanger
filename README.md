@@ -5,8 +5,6 @@ _Backyard wildlife–safe patrol drone (ROS 2 · PX4 · Gazebo)_
 
 ![drone-image](https://github.com/user-attachments/assets/b8e94ad4-c9ad-49e9-b498-fe2e88ef97f2)
 
-
-
 ---
 
 ## Overview
@@ -58,6 +56,60 @@ A compact multirotor that patrols a geofenced backyard or campus area, detects c
 Short interactions only, no contact. Respect airspace and neighbors. Manual override available at all times. We consult wildlife and ethics guidance to align with humane best practices.
 
 ---
-  - https://neurai.sites.northeastern.edu/research/wildlife%E2%80%91safe-backyard-patrol-drone/  
+
+## Team Resources (curated from Teams)
+Aggregated and categorized references for setup, simulation, and development.
+
+### 1) Getting Started / Install
+- **QGroundControl (QGC) — Download & Install (v5)**  
+  <https://docs.qgroundcontrol.com/Stable_V5.0/en/qgc-user-guide/getting_started/download_and_install.html>
+
+### 2) Internal Notes & Guides
+- **Senior Member Notes (internal GDoc)** — Setup tips, gotchas, and workflow guidance.  
+  <https://docs.google.com/document/d/1o-dyEhTHNcyCs2oJularQTqOe9C_kmq4pDHSJ8qubyA/edit?tab=t.0>
+- **Drone Project Setup & Progress (internal GDoc)** — Running log of project decisions and milestones.  
+  <https://docs.google.com/document/d/1BMbUP61QGyJT_Y7DdSopzRrnQRWRtctJrLJMkWndU6I/edit?tab=t.0#heading=h.svnmdzcb7y41>
+
+> _Note:_ The two Google Docs above are team‑internal. Make sure you have access via your NU account.
+
+### 3) Simulation Logic Diagram
+- (Insert the diagram image in the repo and update the path below)
+
+  <img width="1804" height="543" alt="image" src="https://github.com/user-attachments/assets/871433ff-a095-4967-b88b-b073ebe14cbf" />
+
+
+  _Suggested path:_ `docs/sim-logic.png`  
+  _Tip:_ Commit the source (e.g., draw.io / Figma) alongside the exported PNG.
+
+### 4) Key Repos & Middleware
+- **PX4 Autopilot** — Flight stack for SITL/HITL and hardware.  
+  <https://github.com/PX4/PX4-Autopilot>
+- **Micro XRCE-DDS Agent (eProsima)** — Lightweight DDS agent for microcontrollers / companion links.  
+  <https://github.com/eProsima/Micro-XRCE-DDS-Agent>
+
+### 5) Companion Computer & Integration
+- **PX4 ↔ Raspberry Pi (Companion Computer)** — Messaging and integration guide.  
+  <https://docs.px4.io/main/en/companion_computer/pixhawk_rpi>
+
+### 6) Simulation & Robotics Frameworks
+- **NVIDIA Isaac Sim** — Physically‑based sim on Omniverse; sensors & USD workflows.  
+  <https://github.com/isaac-sim/IsaacSim>
+- **Drake (MIT)** — Modeling, simulation, and control with modern tooling.  
+  <https://drake.mit.edu/>
+
+### 7) Compliance & Remote ID
+- **PX4 Remote ID** — Reference for Remote ID support and hardware options.  
+  <https://docs.px4.io/main/en/peripherals/remote_id.html>
 
 ---
+
+## Quick Links
+- NEURAI project page:  
+  https://neurai.sites.northeastern.edu/research/wildlife%E2%80%91safe-backyard-patrol-drone/
+- PX4 Autopilot repo:  
+  https://github.com/PX4/PX4-Autopilot
+- QGC install guide (v5):  
+  https://docs.qgroundcontrol.com/Stable_V5.0/en/qgc-user-guide/getting_started/download_and_install.html
+
+---
+
