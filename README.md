@@ -70,16 +70,11 @@ Aggregated and categorized references for setup, simulation, and development.
 - **Drone Project Setup & Progress (internal GDoc)** — Running log of project decisions and milestones.  
   <https://docs.google.com/document/d/1BMbUP61QGyJT_Y7DdSopzRrnQRWRtctJrLJMkWndU6I/edit?tab=t.0#heading=h.svnmdzcb7y41>
 
-> _Note:_ The two Google Docs above are team‑internal. Make sure you have access via your NU account.
-
 ### 3) Simulation Logic Diagram
 - (Insert the diagram image in the repo and update the path below)
 
   <img width="1804" height="543" alt="image" src="https://github.com/user-attachments/assets/871433ff-a095-4967-b88b-b073ebe14cbf" />
 
-
-  _Suggested path:_ `docs/sim-logic.png`  
-  _Tip:_ Commit the source (e.g., draw.io / Figma) alongside the exported PNG.
 
 ### 4) Key Repos & Middleware
 - **PX4 Autopilot** — Flight stack for SITL/HITL and hardware.  
