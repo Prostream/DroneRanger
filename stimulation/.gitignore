@@ -1,0 +1,51 @@
+# ROS2
+build/
+install/
+log/
+*.bag
+*.db3
+
+# Unity
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Ll]ogs/
+[Uu]ser[Ss]ettings/
+*.pidb.meta
+*.pdb.meta
+*.mdb.meta
+
+# PX4
+Tools/
+build*/
+*.o
+*.a
+.catkin_tools/
+.catkin_workspace
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.env
+venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project specific
+data/logs/*.log
+data/datasets/*.csv
+*.tmp
+
+*:Zone.Identifier
