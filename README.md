@@ -104,6 +104,8 @@ Aggregated and categorized references for setup, simulation, and development.
   https://github.com/PX4/PX4-Autopilot
 - QGC install guide (v5):  
   https://docs.qgroundcontrol.com/Stable_V5.0/en/qgc-user-guide/getting_started/download_and_install.html
+- Check before take off:
+  https://faa.maps.arcgis.com/apps/webappviewer/index.html?id=9c2e4406710048e19806ebf6a06754ad
 
 ---
 
