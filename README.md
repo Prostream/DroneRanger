@@ -71,7 +71,6 @@ Aggregated and categorized references for setup, simulation, and development.
   <https://docs.google.com/document/d/1BMbUP61QGyJT_Y7DdSopzRrnQRWRtctJrLJMkWndU6I/edit?tab=t.0#heading=h.svnmdzcb7y41>
 
 ### 3) Simulation Logic Diagram
-- (Insert the diagram image in the repo and update the path below)
 
   <img width="1804" height="543" alt="image" src="https://github.com/user-attachments/assets/871433ff-a095-4967-b88b-b073ebe14cbf" />
 
