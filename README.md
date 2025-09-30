@@ -67,6 +67,8 @@ Aggregated and categorized references for setup, simulation, and development.
 ### 2) Internal Notes & Guides
 - **Senior Member Notes (internal GDoc)** — Setup tips, gotchas, and workflow guidance.  
   <https://docs.google.com/document/d/1o-dyEhTHNcyCs2oJularQTqOe9C_kmq4pDHSJ8qubyA/edit?tab=t.0>
+- **quick start note** — Setup workflow.  
+  https://docs.google.com/document/d/1abWdo10wY-8am6V406Svh6lLqH4I-2TrgxP-VBazusM/edit?tab=t.0#heading=h.cezt6b87m717
 - **Drone Project Setup & Progress (internal GDoc)** — Running log of project decisions and milestones.  
   <https://docs.google.com/document/d/1BMbUP61QGyJT_Y7DdSopzRrnQRWRtctJrLJMkWndU6I/edit?tab=t.0#heading=h.svnmdzcb7y41>
 
