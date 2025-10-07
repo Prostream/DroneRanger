@@ -1,0 +1,21 @@
+# Simple takeoff mission configuration
+
+mission:
+  name: "Simple Takeoff"
+  description: "Basic takeoff, hover, and land mission"
+
+parameters:
+  takeoff_altitude: 3.0      # meters
+  hover_duration: 10.0       # seconds
+  safety_timeout: 30.0       # seconds
+  position_tolerance: 0.3    # meters
+
+flight_profile:
+  takeoff_speed: 1.0         # m/s
+  descent_speed: 0.8         # m/s
+  hover_stability: 0.1       # position tolerance while hovering
+
+safety:
+  max_altitude: 10.0         # meters
+  emergency_descent_rate: 2.0 # m/s
+  battery_warning_level: 25.0 # %

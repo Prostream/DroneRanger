@@ -1,0 +1,35 @@
+# Drone parameters configuration
+
+# Flight parameters
+flight:
+  max_velocity: 5.0          # m/s
+  max_acceleration: 3.0      # m/s²
+  max_altitude: 50.0         # m
+  min_altitude: 0.5          # m
+  position_tolerance: 0.3    # m
+  velocity_tolerance: 0.1    # m/s
+
+# Safety parameters
+safety:
+  emergency_timeout: 60.0    # s
+  low_battery_threshold: 20.0 # %
+  max_tilt_angle: 30.0       # degrees
+  geofence_radius: 100.0     # m
+
+# Control parameters
+control:
+  control_frequency: 20.0    # Hz (50ms)
+  offboard_timeout: 0.5      # s
+
+# Sensor parameters
+sensors:
+  obstacle_detection_range: 10.0  # m
+  obstacle_avoidance_distance: 2.0  # m
+  lidar_update_rate: 10.0    # Hz
+  camera_update_rate: 30.0   # Hz
+
+# Navigation parameters
+navigation:
+  waypoint_tolerance: 0.5    # m
+  path_planning_resolution: 0.1  # m
+  obstacle_inflation_radius: 0.5  # m
