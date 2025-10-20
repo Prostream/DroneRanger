@@ -41,7 +41,7 @@ class DroneController(Node):
 
         # Subscribers
         self.vehicle_status_sub = self.create_subscription(
-            VehicleStatus, '/fmu/out/vehicle_status',
+            VehicleStatus, '/fmu/out/vehicle_status_v1',
             self.vehicle_status_callback, qos_profile)
         self.vehicle_odometry_sub = self.create_subscription(
             VehicleOdometry, '/fmu/out/vehicle_odometry',
@@ -123,10 +123,15 @@ class DroneController(Node):
         msg.from_external = True
         self.vehicle_command_pub.publish(msg)
 
-    def arm(self):
+    def arm(self, force=True):
         """Arm the vehicle."""
-        self.publish_vehicle_command(VehicleCommand.VEHICLE_CMD_COMPONENT_ARM_DISARM, param1=1.0)
-        self.get_logger().info('Arm command sent')
+        # param2=21196.0 forces arming (bypasses safety checks)
+        self.publish_vehicle_command(
+            VehicleCommand.VEHICLE_CMD_COMPONENT_ARM_DISARM,
+            param1=1.0,
+            param2=21196.0 if force else 0.0
+        )
+        self.get_logger().info('Arm command sent (force={})'.format(force))
 
     def disarm(self):
         """Disarm the vehicle."""

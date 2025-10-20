@@ -31,6 +31,11 @@ setup(
 
             # Mission executables
             'simple_takeoff = drone_autonomy.missions.simple_takeoff:main',
+            'square_flight = drone_autonomy.missions.square_flight:main',
+            'circle_flight = drone_autonomy.missions.circle_flight:main',
+            'figure_eight = drone_autonomy.missions.figure_eight:main',
+            'orbit_point = drone_autonomy.missions.orbit_point:main',
+            'pursuit_flight = drone_autonomy.missions.pursuit_flight:main',
             'waypoint_mission = drone_autonomy.missions.waypoint_mission:main',
             'house_inspection = drone_autonomy.missions.house_inspection:main',
 
