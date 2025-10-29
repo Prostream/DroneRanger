@@ -19,6 +19,11 @@ A compact multirotor that patrols a geofenced backyard or campus area, detects c
 
 ---
 
+## Project structure
+<img width="1802" height="1170" alt="屏幕截图 2025-10-29 145544" src="https://github.com/user-attachments/assets/f03f80c5-a30b-4d15-b8cf-5569f47eefca" />
+
+---
+
 ## How it works
 1. **Plan** — Define a geofence, privacy zones, and a patrol schedule.  
 2. **Patrol** — The drone follows waypoints, loitering at key spots.  
