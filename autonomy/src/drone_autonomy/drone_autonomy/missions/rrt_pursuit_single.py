@@ -17,12 +17,17 @@ Key points
 
 Avoidance Strategy:
 1. Direct mode: fly toward goal
-2. Obstacle detected → BACK UP first (safety margin)
-3. After backing up → rotate 90° (left or right, choose unvisited)
-4. Check new direction with Unity sensor
+2. Obstacle detected → STOP and rotate in place to explore
+3. Progressive angle exploration (2s stabilization per angle):
+   - 30° (left/right alternating)
+   - 45° (opposite side)
+   - 60° (opposite side)
+   - 90° (opposite side)
+4. After 2s stabilization, check sensor with 0.33s confirmation
 5. If clear: advance forward in exploration direction
-6. If blocked: try opposite 90° rotation
-7. After moving past obstacle: return to direct mode
+6. If all 4 angles blocked → VERTICAL ESCAPE (+5m)
+7. After vertical escape: continue pursuit at new altitude
+8. After moving past obstacle: return to direct mode
 
 PX4 topics (uXRCE-DDS, ROS 2):
   pub: /fmu/in/offboard_control_mode     (px4_msgs/OffboardControlMode)
@@ -131,7 +136,7 @@ class RRTPursuitFixed(Node):
         self.visited_cells = set()              # set of (grid_x, grid_y) tuples of explored cells
         self.obstacle_map = {}                  # dict: {(grid_x, grid_y): set([blocked_yaw_angles])}
         self.exploration_path = []              # list of recent (grid_x, grid_y, yaw) tuples
-        self.current_heading_mode = 'direct'    # 'direct', 'explore_left', 'explore_right'
+        self.current_heading_mode = 'direct'    # 'direct', 'explore_left', 'explore_right', 'vertical_escape'
         self.exploration_start_time = None      # timestamp when exploration started
         self.locked_heading = None              # heading to maintain during exploration
         self.direction_switch_cooldown = 0      # cycles to wait before allowing another direction switch
@@ -144,6 +149,12 @@ class RRTPursuitFixed(Node):
         self.last_move_e = None
         self.clear_confirmation_count = 0       # count consecutive clear detections before proceeding
         self.cooldown_blocked_count = 0         # count consecutive blocked detections during cooldown
+        self.last_reset_time = None             # timestamp of last reset to avoid rapid re-triggering
+
+        # vertical escape state
+        self.vertical_escape_start_z = None     # starting altitude (zD) when escape begins
+        self.vertical_escape_target_z = None    # target altitude (zD) for escape
+        self.cruise_altitude_z = None           # current cruise altitude after vertical escape (if any)
 
         # ---------- Publishers ----------
         qos = QoSProfile(
@@ -328,12 +339,13 @@ class RRTPursuitFixed(Node):
     def choose_exploration_angle(self, curN: float, curE: float, direct_yaw: float, step: float, stuck_count: int = 0):
         """
         Choose exploration angle with progressive escalation based on stuck count.
-        Strategy: Start small, increase if blocked repeatedly.
+        Strategy: Start small, increase if blocked repeatedly, up to 90°.
+        If all 4 angles fail, vertical escape will be triggered.
 
         stuck_count=0: 30° (first try)
         stuck_count=1: 45° (second try)
         stuck_count=2: 60° (third try)
-        stuck_count≥3: 90° (last resort)
+        stuck_count≥3: 90° (fourth try, last resort before vertical escape)
 
         Returns: (chosen_yaw, angle_deg, side)
         """
@@ -423,7 +435,15 @@ class RRTPursuitFixed(Node):
         if self.current_heading_mode == 'direct':
             # Direct mode: heading toward goal
             if obstacle_detected:
-                # Obstacle ahead! STOP and turn in place (NO BACKUP)
+                # Check if we just reset recently (within 2 seconds) - avoid rapid re-triggering
+                if self.last_reset_time is not None and (t_now_s - self.last_reset_time) < 2.0:
+                    # Too soon after reset, hold position briefly
+                    self.get_logger().info(
+                        f"[Exploration] Obstacle detected but just reset {t_now_s - self.last_reset_time:.1f}s ago, holding..."
+                    )
+                    return curN, curE, direct_yaw
+
+                # Obstacle ahead! STOP and turn in place
                 self.get_logger().warn("[Exploration] Obstacle detected! Turning in place...")
 
                 # Mark current position as visited (blocked in this direction)
@@ -449,9 +469,12 @@ class RRTPursuitFixed(Node):
                 self.locked_heading = chosen_yaw
                 self.exploration_start_time = t_now_s
 
-                # Initialize counters
-                self.direction_switch_cooldown = 10
-                self.initial_cooldown = 10
+                # Initialize counters - 2 seconds @ 30Hz = 60 cycles minimum wait
+                hz = float(self.get_parameter('hz').value)
+                mandatory_wait_cycles = int(2.0 * hz)  # 2 seconds of mandatory wait
+
+                self.direction_switch_cooldown = mandatory_wait_cycles
+                self.initial_cooldown = mandatory_wait_cycles
                 self.stuck_counter = 0
                 self.exploration_move_count = 0
                 self.explore_start_n = curN
@@ -460,6 +483,10 @@ class RRTPursuitFixed(Node):
                 self.last_move_e = curE
                 self.clear_confirmation_count = 0
                 self.cooldown_blocked_count = 0
+
+                self.get_logger().info(
+                    f"[Exploration] Starting {mandatory_wait_cycles} cycle ({2.0:.1f}s) stabilization wait"
+                )
 
                 # STAY IN PLACE while rotating (no backup)
                 return curN, curE, self.locked_heading
@@ -482,59 +509,42 @@ class RRTPursuitFixed(Node):
                 )
                 self._first_explore_logged = True
 
-            # Decrement cooldown timer - SIMPLIFIED for faster response
+            # Decrement cooldown timer - FULL 2 SECOND WAIT before checking sensor
             if self.direction_switch_cooldown > 0:
                 self.direction_switch_cooldown -= 1
 
-                # Calculate minimum mandatory wait period (reduced to 3 cycles for faster response)
-                min_wait_cycles = 3
-                initial_cd = getattr(self, 'initial_cooldown', 10)
-                in_mandatory_wait = self.direction_switch_cooldown > (initial_cd - min_wait_cycles)
+                # ENTIRE cooldown is mandatory wait (2 seconds) - ignore sensor completely
+                initial_cd = getattr(self, 'initial_cooldown', 60)
 
-                # Log cooldown status periodically
-                if self.direction_switch_cooldown in [8, 5, 3, 0]:
+                # Log cooldown status periodically (every 15 cycles = 0.5s @ 30Hz)
+                if self.direction_switch_cooldown % 15 == 0:
+                    elapsed_s = (initial_cd - self.direction_switch_cooldown) / float(self.get_parameter('hz').value)
+                    remaining_s = self.direction_switch_cooldown / float(self.get_parameter('hz').value)
                     self.get_logger().info(
-                        f"[Exploration] Cooldown: {self.direction_switch_cooldown}, obstacle={obstacle_detected}, "
-                        f"mandatory_wait={in_mandatory_wait}, clear_count={self.clear_confirmation_count}"
+                        f"[Exploration] Stabilizing: {remaining_s:.1f}s remaining (elapsed={elapsed_s:.1f}s), "
+                        f"holding at {math.degrees(self.locked_heading):.1f}°"
                     )
 
-                # During MANDATORY wait period, ignore sensor (let drone stabilize)
-                if in_mandatory_wait:
+                # During entire 2 second period, ignore sensor and hold position
+                return curN, curE, self.locked_heading
+
+            # After 2 second stabilization, NOW check sensor reading
+            if obstacle_detected:
+                # Count consecutive blocked readings AFTER stabilization
+                self.cooldown_blocked_count += 1
+
+                # Require 10 consecutive blocked readings (0.33s @ 30Hz) to confirm it's really blocked
+                if self.cooldown_blocked_count < 10:
+                    self.get_logger().info(
+                        f"[Exploration] Blocked detected after stabilization, confirming... ({self.cooldown_blocked_count}/10)"
+                    )
                     return curN, curE, self.locked_heading
 
-                # After mandatory wait, check sensor with REDUCED confirmation (3 instead of 5)
-                if not obstacle_detected:
-                    self.clear_confirmation_count += 1
-                    self.cooldown_blocked_count = 0
-                    self.get_logger().info(
-                        f"[Exploration] Clear during cooldown (remaining={self.direction_switch_cooldown}, count={self.clear_confirmation_count})"
-                    )
-                    # Require only 3 consecutive clear cycles for faster response
-                    if self.clear_confirmation_count >= 3:
-                        self.get_logger().info("[Exploration] Clear confirmed (3 consecutive), ending cooldown")
-                        self.direction_switch_cooldown = 0
-                        self.clear_confirmation_count = 0
-                        # Fall through to movement logic
-                    else:
-                        return curN, curE, self.locked_heading
-                else:
-                    # Still blocked during cooldown
-                    self.clear_confirmation_count = 0
-                    self.cooldown_blocked_count += 1
+                # Confirmed blocked after 10 consecutive readings
+                self.get_logger().warn(
+                    f"[Exploration] Confirmed BLOCKED at {math.degrees(self.locked_heading):.1f}° after 2s stabilization + confirmation"
+                )
 
-                    # If blocked for 5+ cycles after mandatory wait, switch direction faster
-                    if self.cooldown_blocked_count >= 5:
-                        self.get_logger().warn(
-                            f"[Exploration] Still blocked after {self.cooldown_blocked_count} cycles, ending cooldown to try new angle"
-                        )
-                        self.direction_switch_cooldown = 0
-                        self.cooldown_blocked_count = 0
-                        # Fall through to blocked logic to switch direction
-                    else:
-                        return curN, curE, self.locked_heading
-
-            if obstacle_detected:
-                # Still blocked in this direction
                 self.mark_visited(curN, curE)
                 self.mark_direction_blocked(curN, curE, self.locked_heading)
                 self.add_to_path(curN, curE, self.locked_heading)
@@ -542,21 +552,33 @@ class RRTPursuitFixed(Node):
                 # Increment stuck counter
                 self.stuck_counter += 1
 
-                # Check if we're truly stuck (both directions blocked repeatedly)
+                # Check if we're truly stuck (all 4 angles blocked: 30°, 45°, 60°, 90°)
                 if self.stuck_counter > 3:
                     self.get_logger().warn(
-                        f"[Exploration] Stuck counter={self.stuck_counter}, resetting to direct mode"
+                        f"[Exploration] Stuck counter={self.stuck_counter} (all 4 angles blocked), "
+                        f"initiating VERTICAL ESCAPE +5m"
                     )
-                    # Reset to direct mode and clear state
-                    self.current_heading_mode = 'direct'
-                    self.exploration_start_time = None
-                    self.locked_heading = None
+                    # Enter vertical escape mode
+                    self.current_heading_mode = 'vertical_escape'
+                    self.vertical_escape_start_z = self.pz  # Current altitude (Down coordinate)
+                    self.vertical_escape_target_z = self.pz - 5.0  # Go UP 5m (Down becomes more negative)
+                    self.last_reset_time = t_now_s
+
+                    # Reset exploration counters
                     self.stuck_counter = 0
                     self.exploration_move_count = 0
                     self.clear_confirmation_count = 0
                     self.cooldown_blocked_count = 0
+                    self.direction_switch_cooldown = 0
                     self._first_explore_logged = False
-                    return curN, curE, direct_yaw
+
+                    self.get_logger().info(
+                        f"[Vertical Escape] Current alt: {-self.pz:.2f}m (zD={self.pz:.2f}), "
+                        f"Target alt: {-self.vertical_escape_target_z:.2f}m (zD={self.vertical_escape_target_z:.2f})"
+                    )
+
+                    # Hold XY position, only change altitude
+                    return curN, curE, self.heading
 
                 # Try switching direction with PROGRESSIVE angle increase
                 self.get_logger().info(
@@ -581,17 +603,36 @@ class RRTPursuitFixed(Node):
 
                 self.locked_heading = chosen_yaw
 
-                # Set REDUCED cooldown for faster switching
-                self.direction_switch_cooldown = 8
-                self.initial_cooldown = 8
+                # Set FULL 2 second cooldown for new direction
+                hz = float(self.get_parameter('hz').value)
+                mandatory_wait_cycles = int(2.0 * hz)
+
+                self.direction_switch_cooldown = mandatory_wait_cycles
+                self.initial_cooldown = mandatory_wait_cycles
                 self.cooldown_blocked_count = 0
                 self.clear_confirmation_count = 0
                 self.get_logger().info(
-                    f"[Exploration] Switched direction, cooldown={self.direction_switch_cooldown}"
+                    f"[Exploration] Switched direction, starting {mandatory_wait_cycles} cycle ({2.0:.1f}s) wait"
                 )
                 return curN, curE, self.locked_heading
 
             else:
+                # After 2s stabilization, path appears clear
+                # Require 10 consecutive clear readings to confirm
+                self.clear_confirmation_count += 1
+                self.cooldown_blocked_count = 0
+
+                if self.clear_confirmation_count < 10:
+                    self.get_logger().info(
+                        f"[Exploration] Clear detected after stabilization, confirming... ({self.clear_confirmation_count}/10)"
+                    )
+                    return curN, curE, self.locked_heading
+
+                # Confirmed clear! Move forward
+                self.get_logger().info(
+                    f"[Exploration] Confirmed CLEAR at {math.degrees(self.locked_heading):.1f}° after 2s stabilization + confirmation"
+                )
+
                 # Clear ahead in exploration direction! Move forward
                 # Use REDUCED step size for safety (better obstacle detection)
                 safe_step = min(step, 2.5)  # Limit to 2.5m max to stay within sensor range
@@ -611,8 +652,10 @@ class RRTPursuitFixed(Node):
 
                 # Only count as a move if we actually moved significantly (> 0.5m)
                 if actual_dist > 0.5:
-                    # Reset stuck counter when we successfully move
+                    # Reset stuck counter and confirmation counts when we successfully move
                     self.stuck_counter = 0
+                    self.clear_confirmation_count = 0  # Reset for next detection
+                    self.cooldown_blocked_count = 0
                     self.exploration_move_count += 1
 
                     # Calculate distance from exploration start
@@ -654,6 +697,46 @@ class RRTPursuitFixed(Node):
                     self._first_explore_logged = False
 
                 return nxtN, nxtE, self.locked_heading
+
+        elif self.current_heading_mode == 'vertical_escape':
+            # Vertical escape mode: climb up 5m to escape obstacle maze
+            alt_error = abs(self.pz - self.vertical_escape_target_z)
+
+            # Log progress periodically
+            if not hasattr(self, '_last_vert_log_time') or (t_now_s - self._last_vert_log_time) > 0.5:
+                current_alt = -self.pz  # Convert to "up" for logging
+                target_alt = -self.vertical_escape_target_z
+                climbed = -(self.pz - self.vertical_escape_start_z)  # How much we've climbed
+                self.get_logger().info(
+                    f"[Vertical Escape] Current: {current_alt:.2f}m, Target: {target_alt:.2f}m, "
+                    f"Climbed: {climbed:.2f}m, Error: {alt_error:.2f}m"
+                )
+                self._last_vert_log_time = t_now_s
+
+            # Check if we've reached target altitude (within 30cm tolerance)
+            if alt_error <= 0.3:
+                # Save new cruise altitude
+                self.cruise_altitude_z = self.vertical_escape_target_z
+
+                self.get_logger().info(
+                    f"[Vertical Escape] SUCCESS! Reached target altitude {-self.cruise_altitude_z:.2f}m UP "
+                    f"(zD={self.cruise_altitude_z:.2f}), returning to DIRECT mode at NEW altitude"
+                )
+
+                # Reset to direct mode and resume pursuit at new altitude
+                self.current_heading_mode = 'direct'
+                self.exploration_start_time = None
+                self.locked_heading = None
+                self.vertical_escape_start_z = None
+                self.vertical_escape_target_z = None
+                self._last_vert_log_time = None
+
+                # Continue toward goal from new altitude
+                return curN, curE, direct_yaw
+            else:
+                # Still climbing - hold XY position, only update Z
+                # Note: The main loop will use the escape target altitude from our state
+                return curN, curE, self.heading
 
         # Fallback
         return curN, curE, direct_yaw
@@ -728,7 +811,18 @@ class RRTPursuitFixed(Node):
         elif self.stage == Stage.PURSUIT:
             # Convert target ENU to NED goal (if target exists), else hold
             takeoff_alt_m = float(self.get_parameter('takeoff_alt_m').value)
-            zD_goal = -abs(takeoff_alt_m)  # maintain altitude
+
+            # Determine altitude: priority order
+            # 1. If in vertical escape mode, use target escape altitude
+            # 2. If we've done a vertical escape before, use that cruise altitude
+            # 3. Otherwise, use nominal takeoff altitude
+            if self.current_heading_mode == 'vertical_escape' and self.vertical_escape_target_z is not None:
+                zD_goal = self.vertical_escape_target_z  # Actively climbing
+            elif self.cruise_altitude_z is not None:
+                zD_goal = self.cruise_altitude_z  # Maintain post-escape altitude
+            else:
+                zD_goal = -abs(takeoff_alt_m)  # Normal altitude
+
             if self.tgt_e is None or self.tgt_n is None:
                 # No target yet; hold position at current x/y and altitude
                 self.publish_sp(self.px, self.py, zD_goal, self.heading)
@@ -742,7 +836,7 @@ class RRTPursuitFixed(Node):
             # Iterative exploration-based avoidance
             use_exploration = bool(self.get_parameter('use_iterative_exploration').value)
             if use_exploration:
-                # Use iterative exploration strategy: rotate 90° when blocked, track visited cells
+                # Use iterative exploration strategy: rotate when blocked, vertical escape if all angles blocked
                 nxtN, nxtE, yaw = self.iterative_exploration_step(
                     self.px, self.py, goalN, goalE, step_xy, self.obstacle_detected
                 )
